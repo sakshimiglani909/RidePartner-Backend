@@ -22,7 +22,7 @@ const sendDualNotification = async ({ userId, fcmToken, socketEvent, title, body
         }
     }
 };
-const WhatsAppLog = require('../models/WhatsAppLog');
+const WhatsAppLog = require('../models/whatsApplog');
 const { sendWhatsAppNotification } = require('../services/whatsappService');
 
 // Admin WhatsApp Send Controller

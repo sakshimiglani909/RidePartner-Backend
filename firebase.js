@@ -1,25 +1,38 @@
-const { initializeApp, cert, getApps } = require('firebase-admin/app');
+
+
+const {
+  initializeApp,
+  cert,
+  getApps
+} = require('firebase-admin/app');
+
 const { getMessaging } = require('firebase-admin/messaging');
-const path = require('path');
+const serviceAccount = require('./serviceAccountKey.json');
+
 try {
-  const serviceAccount = require(path.resolve(__dirname, './serviceAccountKey.json'));
   if (getApps().length === 0) {
-    initializeApp({
-      credential: cert(serviceAccount) // Direct cert function call
-    });
+  initializeApp({
+  credential: cert(serviceAccount)
+});
   }
+
   console.log("🔥 Firebase Admin SDK initialized successfully!");
 } catch (error) {
   console.log("❌ Firebase Init Error:", error.message);
 }
-// 🟢 FIX: dataPayload optional parameter add kiya
-const sendPushNotification = async (fcmToken, title, body, dataPayload = {}) => {
+
+const sendPushNotification = async (
+  fcmToken,
+  title,
+  body,
+  dataPayload = {}
+) => {
   if (!fcmToken) return;
 
   try {
     if (getApps().length > 0) {
-      // 🟢 Payload ki saari values ko explicitly String me convert karein
       const stringifiedData = {};
+
       if (dataPayload && typeof dataPayload === 'object') {
         Object.keys(dataPayload).forEach((key) => {
           stringifiedData[key] = String(dataPayload[key]);
@@ -27,25 +40,42 @@ const sendPushNotification = async (fcmToken, title, body, dataPayload = {}) => 
       }
 
       const message = {
-        notification: { title, body },
-        data: stringifiedData, // 👈 Safe stringified data object pass kiya
+        notification: {
+          title,
+          body
+        },
+        data: stringifiedData,
         token: fcmToken,
         android: {
           priority: 'high',
           notification: {
             sound: 'default',
             channelId: 'high_importance_channel',
-            clickAction: 'FLUTTER_NOTIFICATION_CLICK' // 👈 Android deep-linking trigger
+            clickAction: 'FLUTTER_NOTIFICATION_CLICK'
           }
         }
       };
+
       const response = await getMessaging().send(message);
-      console.log('✅ Notification sent successfully:', response);
+
+      console.log(
+        '✅ Notification sent successfully:',
+        response
+      );
     } else {
-      console.log('❌ Firebase initialize nahi hai, notification nahi bheja ja saka.');
+      console.log(
+        '❌ Firebase initialize nahi hai, notification nahi bheja ja saka.'
+      );
     }
   } catch (error) {
-    console.error('❌ Error sending notification:', error.message);
+    console.error(
+      '❌ Error sending notification:',
+      error.message
+    );
   }
 };
-module.exports = { sendPushNotification, admin: require('firebase-admin') };
+
+module.exports = {
+  sendPushNotification,
+  admin: require('firebase-admin')
+};
