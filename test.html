@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Admin Dashboard & Socket Test</title>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; line-height: 1.6; }
+        .card { border: 1px solid #ccc; padding: 15px; border-radius: 8px; max-width: 400px; margin-bottom: 20px; }
+        button { background-color: #28a745; color: white; border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        button:hover { background-color: #218838; }
+        input { width: 90%; padding: 8px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <h2>RidePartner Admin Quick Test Panel 🚗</h2>
+    <p id="status">Connecting Socket...</p>
+
+    <div class="card">
+        <h3>Approve Driver Test</h3>
+        <label>Driver ID:</label><br>
+        <input type="text" id="driverIdInput" value="6a76af96eec3d6cb74758c3b" placeholder="Enter MongoDB Driver ID"><br>
+        <button onclick="approveDriverApi()">Approve Driver & Send Notification 🎉</button>
+    </div>
+
+    <script>
+        // Backend URL (Ngrok)
+        const BASE_URL = 'https://folk-goofiness-immobile.ngrok-free.dev';
+
+        // Socket Connection
+        const socket = io(BASE_URL);
+
+        socket.on('connect', () => {
+            document.getElementById('status').innerText = '🟢 Connected to Server! Socket ID: ' + socket.id;
+        });
+
+        // 🟢 ADMIN APPROVE DRIVER API CALL
+        async function approveDriverApi() {
+            const driverId = document.getElementById('driverIdInput').value;
+            if (!driverId) {
+                alert('Please enter a valid Driver ID');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${BASE_URL}/api/admin/approve`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'ngrok-skip-browser-warning': 'true'
+                    },
+                    body: JSON.stringify({ driverId: driverId })
+                });
+
+                const data = await response.json();
+                console.log('Approve Response:', data);
+                alert('Server Reply: ' + JSON.stringify(data.message || data));
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Failed to send request: ' + error.message);
+            }
+        }
+    </script>
+</body>
+</html>
