@@ -1,12 +1,20 @@
 const dns = require('dns');
 dns.setDefaultResultOrder('ipv4first'); 
+
 const dotenv = require('dotenv'); 
 dotenv.config();
+
 const User = require('../models/User');
 const Driver = require('../models/Driver');
 const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer'); 
 const Withdrawal = require('../models/withdrawal');
+
+if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+    console.warn("⚠️ Warning: EMAIL_USER or EMAIL_PASS environment variables are missing!");
+} else {
+    console.log(`📧 Nodemailer initialized for user: ${process.env.EMAIL_USER}`);
+}
 
 const transporter = nodemailer.createTransport({
   service: "gmail",
@@ -28,15 +36,19 @@ exports.sendOtpController = async (req, res) => {
         }
         const emailKey = email.toLowerCase().trim();
 
+        console.log(`📩 Received OTP request for email: [${emailKey}]`);
+
         const userExists = await User.findOne({ email: emailKey });
         const driverExists = await Driver.findOne({ email: emailKey });
         
         if (userExists || driverExists) {
+            console.log(`⚠️ Email [${emailKey}] is already registered. Aborting OTP generation.`);
             return res.status(400).json({ 
                 success: false, 
                 message: "This email is already registered! Please login or use another email." 
             });
         }
+
         const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
         otpDatabase[emailKey] = {
@@ -59,13 +71,30 @@ exports.sendOtpController = async (req, res) => {
             `
         };
 
-        await transporter.sendMail(mailOptions);
-        console.log(`📡 OTP sent to [${emailKey}]: ${otp}`);
+        console.log(`⏳ Attempting to send email via Nodemailer to [${emailKey}]...`);
+        
+        const info = await transporter.sendMail(mailOptions);
+        
+        console.log(`✅ OTP Email sent successfully to [${emailKey}]! MessageID: ${info.messageId}`);
         return res.status(200).json({ success: true, message: "OTP sent successfully!" });
 
     } catch (error) {
-        console.error("💥 Error sending email:", error);
-        return res.status(500).json({ success: false, message: "Failed to send email.", error: error.message });
+        console.error("💥 Error occurred while sending email:", error.message);
+        console.error("📋 Full Error Stack Trace:", error);
+        console.error("🔍 Debug Info:", {
+            code: error.code,
+            command: error.command,
+            response: error.response,
+            errno: error.errno,
+            syscall: error.syscall
+        });
+
+        return res.status(500).json({ 
+            success: false, 
+            message: "Failed to send email.", 
+            error: error.message,
+            errorCode: error.code || 'UNKNOWN_ERROR'
+        });
     }
 };
 
@@ -80,18 +109,22 @@ exports.verifyOtpController = (req, res) => {
     const record = otpDatabase[emailKey];
 
     if (!record) {
+        console.log(`❌ Verification failed: No OTP record found for [${emailKey}].`);
         return res.status(400).json({ success: false, message: "No OTP record found." });
     }
 
     if (Date.now() > record.expiresAt) {
+        console.log(`⏰ Verification failed: OTP expired for [${emailKey}].`);
         delete otpDatabase[emailKey];
         return res.status(400).json({ success: false, message: "OTP has expired!" });
     }
 
     if (record.otp === otp.trim()) {
         otpDatabase[emailKey].isVerified = true; 
+        console.log(`✅ Email [${emailKey}] verified successfully.`);
         return res.status(200).json({ success: true, message: "Email verified successfully!" });
     } else {
+        console.log(`❌ Verification failed: Invalid OTP provided for [${emailKey}].`);
         return res.status(400).json({ success: false, message: "Invalid OTP code." });
     }
 };
