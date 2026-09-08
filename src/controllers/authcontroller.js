@@ -3,18 +3,19 @@ const Driver = require('../models/Driver');
 const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer'); 
 const dotenv = require('dotenv'); 
-const Withdrawal = require('../models/withdrawal'); // 👈 Ise sabse upar baki const ke sath jodein
+const Withdrawal = require('../models/withdrawal'); 
 dotenv.config();
 const transporter = nodemailer.createTransport({
     host: 'smtp.gmail.com',
     port: 587,
     secure: false,
+    family: 4,
     auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS
     },
     tls: {
-        family: 4
+        rejectUnauthorized: false
     }
 });
 const otpDatabase = {};
@@ -153,7 +154,7 @@ if (!vehicleType) {
     licensePhoto: licensePhotoUrl, 
     rcPhoto: rcPhotoUrl,           
     role: 'driver', 
-    vehicleType: vehicleType.toLowerCase().trim(), // 👈 Yeh ensure karega ki 'car', 'bike', ya 'scooty' hi save ho
+    vehicleType: vehicleType.toLowerCase().trim(), 
     isVerified: "pending",
     fcmToken: fcmToken || ""
 });
