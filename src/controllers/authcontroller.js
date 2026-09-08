@@ -3,23 +3,19 @@ const Driver = require('../models/Driver');
 const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer'); 
 const dotenv = require('dotenv'); 
-const Withdrawal = require('../models/withdrawal'); 
+const Withdrawal = require('../models/withdrawal');
 dotenv.config();
+
 const transporter = nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 465,
-    secure: true, 
-    family: 4,
-    connectionTimeout: 10000,
-    auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
-    },
-    tls: {
-        rejectUnauthorized: false
-    }
+  service: "gmail",
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
+  },
 });
+
 const otpDatabase = {};
+
 exports.sendOtpController = async (req, res) => {
     try {
         const { email } = req.body;
@@ -50,14 +46,11 @@ exports.sendOtpController = async (req, res) => {
             from: process.env.EMAIL_USER,
             to: emailKey,
             subject: 'Email Verification Code - Ride Partner App',
-            html: `
-                <div style="font-family: Arial, sans-serif; padding: 20px; border: 1px solid #eee; border-radius: 10px; max-width: 500px;">
-                    <h2 style="color: #FF7A00;">Welcome to Ride Partner App!</h2>
-                    <p>Your 6-digit email verification code (OTP) is:</p>
-                    <h1 style="background: #FAF7F2; padding: 12px 24px; display: inline-block; letter-spacing: 5px; border-radius: 8px; color: #1F1F1F; margin: 10px 0;">${otp}</h1>
-                    <p style="color: #888; font-size: 12px;">Note: This verification code is valid for 5 minutes only.</p>
-                </div>
-            `
+            text: `Welcome to Ride Partner App!
+
+Your 6-digit email verification code (OTP) is: ${otp}
+
+Note: This verification code is valid for 5 minutes only.`
         };
 
         await transporter.sendMail(mailOptions);
@@ -65,10 +58,11 @@ exports.sendOtpController = async (req, res) => {
         return res.status(200).json({ success: true, message: "OTP sent successfully!" });
 
     } catch (error) {
-        console.error("💥 Nodemailer Error:", error);
+        console.error("💥 Error sending email:", error);
         return res.status(500).json({ success: false, message: "Failed to send email.", error: error.message });
     }
 };
+
 exports.verifyOtpController = (req, res) => {
     const { email, otp } = req.body;
 
@@ -95,7 +89,6 @@ exports.verifyOtpController = (req, res) => {
         return res.status(400).json({ success: false, message: "Invalid OTP code." });
     }
 };
-
 exports.registerUser = async (req, res) => {
     try {
         const bodyData = req.body;
@@ -155,7 +148,7 @@ if (!vehicleType) {
     licensePhoto: licensePhotoUrl, 
     rcPhoto: rcPhotoUrl,           
     role: 'driver', 
-    vehicleType: vehicleType.toLowerCase().trim(), 
+    vehicleType: vehicleType.toLowerCase().trim(), // 👈 Yeh ensure karega ki 'car', 'bike', ya 'scooty' hi save ho
     isVerified: "pending",
     fcmToken: fcmToken || ""
 });
