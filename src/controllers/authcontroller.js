@@ -1,13 +1,16 @@
+const dns = require('dns');
+dns.setDefaultResultOrder('ipv4first'); 
+const dotenv = require('dotenv'); 
+dotenv.config();
 const User = require('../models/User');
 const Driver = require('../models/Driver');
 const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer'); 
-const dotenv = require('dotenv'); 
 const Withdrawal = require('../models/withdrawal');
-dotenv.config();
 
 const transporter = nodemailer.createTransport({
   service: "gmail",
+  family: 4, 
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
@@ -46,11 +49,14 @@ exports.sendOtpController = async (req, res) => {
             from: process.env.EMAIL_USER,
             to: emailKey,
             subject: 'Email Verification Code - Ride Partner App',
-            text: `Welcome to Ride Partner App!
-
-Your 6-digit email verification code (OTP) is: ${otp}
-
-Note: This verification code is valid for 5 minutes only.`
+            html: `
+                <div style="font-family: Arial, sans-serif; padding: 20px; border: 1px solid #eee; border-radius: 10px; max-width: 500px;">
+                    <h2 style="color: #FF7A00;">Welcome to Ride Partner App!</h2>
+                    <p>Your 6-digit email verification code (OTP) is:</p>
+                    <h1 style="background: #FAF7F2; padding: 12px 24px; display: inline-block; letter-spacing: 5px; border-radius: 8px; color: #1F1F1F; margin: 10px 0;">${otp}</h1>
+                    <p style="color: #888; font-size: 12px;">Note: This verification code is valid for 5 minutes only.</p>
+                </div>
+            `
         };
 
         await transporter.sendMail(mailOptions);
