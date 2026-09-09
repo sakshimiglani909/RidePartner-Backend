@@ -1,3 +1,6 @@
+const dns = require('dns');
+dns.setDefaultResultOrder('ipv4first');
+
 require('dotenv').config();
 
 console.log("Mongo URL loaded:", !!process.env.MONGODB_URL);

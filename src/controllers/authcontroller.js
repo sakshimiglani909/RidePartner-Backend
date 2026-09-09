@@ -8,6 +8,7 @@ const User = require('../models/User');
 const Driver = require('../models/Driver');
 const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer'); 
+const { Resend } = require('resend');
 const Withdrawal = require('../models/withdrawal');
 
 if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
@@ -17,13 +18,93 @@ if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
 }
 
 const transporter = nodemailer.createTransport({
-  service: "gmail",
-  family: 4, 
+  host: "smtp.gmail.com",
+  port: 587,
+  secure: false,
+  family: 4,
   auth: {
     user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
+    pass: process.env.EMAIL_PASS ? process.env.EMAIL_PASS.replace(/\s+/g, '') : '',
   },
+  tls: {
+    rejectUnauthorized: false
+  },
+  connectionTimeout: 25000,
+  greetingTimeout: 25000,
+  socketTimeout: 25000,
 });
+
+if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+    transporter.verify((error, success) => {
+        if (error) {
+            console.error("❌ Nodemailer SMTP Connection Failed on Startup:", error.message);
+        } else {
+            console.log("✅ Nodemailer SMTP Server is ready to send emails!");
+        }
+    });
+}
+
+//Robust Email Helper: Uses Brevo 
+const sendEmailHelper = async ({ to, subject, html }) => {
+    // 1. Brevo HTTP API
+    if (process.env.BREVO_API_KEY) {
+        console.log(`🌐 [Brevo HTTP API] Attempting to send email to [${to}]...`);
+        const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+            method: 'POST',
+            headers: {
+                'accept': 'application/json',
+                'api-key': process.env.BREVO_API_KEY,
+                'content-type': 'application/json'
+            },
+            body: JSON.stringify({
+                sender: { name: "Ride Partner App", email: process.env.EMAIL_USER || "no-reply@ridepartner.com" },
+                to: [{ email: to }],
+                subject: subject,
+                htmlContent: html
+            })
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+            console.error("💥 Brevo API Error:", data);
+            throw new Error(`Brevo Error: ${data.message || JSON.stringify(data)}`);
+        }
+        console.log(`✅ Brevo Email sent successfully to [${to}]! ID: ${data.messageId || 'OK'}`);
+        return data;
+    } 
+    // 2. Resend HTTP API
+    else if (process.env.RESEND_API_KEY) {
+        console.log(`[Resend HTTP API] Attempting to send email to [${to}]...`);
+        const resend = new Resend(process.env.RESEND_API_KEY);
+        const fromAddress = (process.env.EMAIL_USER && !process.env.EMAIL_USER.endsWith('@gmail.com')) 
+            ? process.env.EMAIL_USER 
+            : 'Ride Partner App <onboarding@resend.dev>';
+
+        const { data, error } = await resend.emails.send({
+            from: fromAddress,
+            to: [to],
+            subject: subject,
+            html: html,
+        });
+
+        if (error) {
+            console.error("💥 Resend API Error:", error);
+            throw new Error(`Resend Error: ${error.message}`);
+        }
+        console.log(`✅ Resend Email sent successfully! MessageID: ${data?.id}`);
+        return data;
+    } 
+    // 3. Nodemailer SMTP Fallback (For local dev)
+    else {
+        console.log(`⏳ [SMTP Fallback] Attempting to send email via Nodemailer to [${to}]...`);
+        return await transporter.sendMail({
+            from: process.env.EMAIL_USER,
+            to: to,
+            subject: subject,
+            html: html,
+        });
+    }
+};
 
 const otpDatabase = {};
 
@@ -71,11 +152,15 @@ exports.sendOtpController = async (req, res) => {
             `
         };
 
-        console.log(`⏳ Attempting to send email via Nodemailer to [${emailKey}]...`);
+        console.log(`⏳ Attempting to send email to [${emailKey}]...`);
         
-        const info = await transporter.sendMail(mailOptions);
+        await sendEmailHelper({
+            to: emailKey,
+            subject: mailOptions.subject,
+            html: mailOptions.html
+        });
         
-        console.log(`✅ OTP Email sent successfully to [${emailKey}]! MessageID: ${info.messageId}`);
+        console.log(`✅ OTP Email sent successfully to [${emailKey}]!`);
         return res.status(200).json({ success: true, message: "OTP sent successfully!" });
 
     } catch (error) {
@@ -354,7 +439,11 @@ exports.forgotPassword = async (req, res) => {
             html: `<p>Your password reset OTP code is: <b>${otp}</b></p>`
         };
         
-        await transporter.sendMail(mailOptions);
+        await sendEmailHelper({
+            to: emailKey,
+            subject: mailOptions.subject,
+            html: mailOptions.html
+        });
         return res.status(200).json({ success: true, message: "Password reset OTP sent to your email! 📩" });
     } catch (error) {
         console.error("🔥 FORGOT PASSWORD ERROR:", error);
