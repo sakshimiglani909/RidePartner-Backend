@@ -8,7 +8,8 @@ const User = require('../models/User');
 const Driver = require('../models/Driver');
 const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer'); 
-const Resend = require('resend');
+const {Resend} = require('resend');
+
 const Withdrawal = require('../models/withdrawal');
 
 if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
