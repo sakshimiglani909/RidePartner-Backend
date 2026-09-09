@@ -15,15 +15,42 @@ if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
 } else {
     console.log(`📧 Nodemailer initialized for user: ${process.env.EMAIL_USER}`);
 }
-
 const transporter = nodemailer.createTransport({
-  service: "gmail",
-  family: 4, 
+  host: "smtp.gmail.com",
+  port: 465,
+  secure: true, 
+  family: 4,   
   auth: {
     user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
+    pass: process.env.EMAIL_PASS ? process.env.EMAIL_PASS.replace(/\s+/g, '') : '',
   },
+  tls: {
+    rejectUnauthorized: false
+  },
+  connectionTimeout: 15000,
+  greetingTimeout: 15000,
+  socketTimeout: 15000,
 });
+
+// 🔍 Startup verification to catch SMTP config errors in Render logs
+if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+    transporter.verify((error, success) => {
+        if (error) {
+            console.error("❌ Nodemailer SMTP Connection Failed on Startup:", error.message);
+        } else {
+            console.log("✅ Nodemailer SMTP Server is ready to send emails!");
+        }
+    });
+}
+
+// const transporter = nodemailer.createTransport({
+//   service: "gmail",
+//   family: 4, 
+//   auth: {
+//     user: process.env.EMAIL_USER,
+//     pass: process.env.EMAIL_PASS,
+//   },
+// });
 
 const otpDatabase = {};
 
@@ -130,6 +157,7 @@ exports.verifyOtpController = (req, res) => {
 };
 exports.registerUser = async (req, res) => {
     try {
+        
         const bodyData = req.body;
       const { 
             name, email, password, phone, age, gender, address, role,
