@@ -17,6 +17,14 @@ if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
     console.log(`📧 Nodemailer initialized for user: ${process.env.EMAIL_USER}`);
 }
 
+// const transporter = nodemailer.createTransport({
+//   service: "gmail",
+//   family: 4, 
+//   auth: {
+//     user: process.env.EMAIL_USER,
+//     pass: process.env.EMAIL_PASS,
+//   },
+// });
 const transporter = nodemailer.createTransport({
   host: "smtp.gmail.com",
   port: 587,
@@ -24,6 +32,7 @@ const transporter = nodemailer.createTransport({
   family: 4,
   auth: {
     user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS ? process.env.EMAIL_PASS.replace(/\s+/g, '') : '',
     pass: process.env.EMAIL_PASS ? process.env.EMAIL_PASS.replace(/\s+/g, '') : '',
   },
   tls: {
@@ -215,6 +224,7 @@ exports.verifyOtpController = (req, res) => {
 };
 exports.registerUser = async (req, res) => {
     try {
+        
         const bodyData = req.body;
       const { 
             name, email, password, phone, age, gender, address, role,
