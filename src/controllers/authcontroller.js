@@ -40,6 +40,39 @@ const transporter = nodemailer.createTransport({
   greetingTimeout: 25000,
   socketTimeout: 25000,
 });
+
+const sendEmailHelper = async ({ to, subject, html }) => {
+    if (process.env.RESEND_API_KEY) {
+        console.log(`[Resend HTTP API] Attempting to send email to [${to}]...`);
+        const resend = new Resend(process.env.RESEND_API_KEY);
+        const fromAddress = (process.env.EMAIL_USER && !process.env.EMAIL_USER.endsWith('@gmail.com')) 
+            ? process.env.EMAIL_USER 
+            : 'Ride Partner App <onboarding@resend.dev>';
+
+        const { data, error } = await resend.emails.send({
+            from: fromAddress,
+            to: [to],
+            subject: subject,
+            html: html,
+        });
+
+        if (error) {
+            console.error("💥 Resend API Error:", error);
+            throw new Error(`Resend Error: ${error.message}`);
+        }
+        console.log(`✅ Resend Email sent successfully! MessageID: ${data?.id}`);
+        return data;
+    } else {
+        console.log(`⏳ [SMTP Fallback] Attempting to send email via Nodemailer to [${to}]...`);
+        return await transporter.sendMail({
+            from: process.env.EMAIL_USER,
+            to: to,
+            subject: subject,
+            html: html,
+        });
+    }
+};
+
 const otpDatabase = {};
 
 exports.sendOtpController = async (req, res) => {
@@ -88,9 +121,13 @@ exports.sendOtpController = async (req, res) => {
 
         console.log(`⏳ Attempting to send email via Nodemailer to [${emailKey}]...`);
         
-        const info = await transporter.sendMail(mailOptions);
-        
-        console.log(`✅ OTP Email sent successfully to [${emailKey}]! MessageID: ${info.messageId}`);
+        // const info = await sendEmailHelper(mailOptions);
+        await sendEmailHelper({
+            to: emailKey,
+            subject: mailOptions.subject,
+            html: mailOptions.html
+        });
+        console.log(`✅ OTP Email sent successfully to [${emailKey}]! OTP: ${otp} (Valid for 5 minutes)`);
         return res.status(200).json({ success: true, message: "OTP sent successfully!" });
 
     } catch (error) {
@@ -370,7 +407,12 @@ exports.forgotPassword = async (req, res) => {
             html: `<p>Your password reset OTP code is: <b>${otp}</b></p>`
         };
         
-        await transporter.sendMail(mailOptions);
+        // await transporter.sendMail(mailOptions);
+        await sendEmailHelper({
+            to: emailKey,
+            subject: mailOptions.subject,
+            html: mailOptions.html
+        });
         return res.status(200).json({ success: true, message: "Password reset OTP sent to your email! 📩" });
     } catch (error) {
         console.error("🔥 FORGOT PASSWORD ERROR:", error);
