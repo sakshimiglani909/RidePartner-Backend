@@ -90,45 +90,60 @@ router.post('/resubmit-document', upload.fields([
 // 🟢 Socket ID & FCM Token DB me Update Karne Ka Route
 router.post('/update-tokens', updateDeviceTokens);
 
-// 💸 WITHDRAWAL EARNINGS ROUTE
+
+        // 💸 WITHDRAWAL EARNINGS ROUTE (Updated for Bank & UPI)
 router.post('/rides/withdraw-earnings', async (req, res) => {
     try {
-        const { driverId, amount, upiId } = req.body;
+        const { driverId, amount, paymentMethod, upiId, bankDetails } = req.body;
         
+        // 1. Driver check
         const driver = await Driver.findById(driverId);
         if (!driver) {
             return res.status(404).json({ success: false, message: "Driver not found" });
         }
 
+        // 2. Balance check
         if (driver.walletBalance < amount) {
             return res.status(400).json({ success: false, message: "You don't have enough balance to withdraw!" });
         }
 
-        if (!upiId) {
-            return res.status(400).json({ success: false, message: "Please provide your UPI ID!" });
+        // 3. Payment Method & Inputs Validation
+        const activeMethod = paymentMethod || 'upi';
+if (activeMethod === 'bank') {
+            if (!bankDetails || !bankDetails.accountHolderName || !bankDetails.accountNumber || !bankDetails.ifscCode) {
+                return res.status(400).json({ success: false, message: "Please provide complete bank account details!" });
+            }
+        } else {
+            if (!upiId) {
+                return res.status(400).json({ success: false, message: "Please provide your UPI ID!" });
+            }
         }
 
+        // 4. Wallet balance deduct karein
         driver.walletBalance -= amount;
         await driver.save();
 
+        // 5. Withdrawal Entry Save karein
         const newwithdrawal = new Withdrawal({
             driverId,
             amount,
-            upiId,
+            paymentMethod: paymentMethod || 'upi',
+            upiId: paymentMethod === 'upi' ? upiId : undefined,
+            bankDetails: paymentMethod === 'bank' ? bankDetails : undefined,
             status: 'Pending'
         });
         await newwithdrawal.save();
 
         return res.status(200).json({ 
             success: true, 
-            message: `Withdrawal request of ₹${amount} submitted successfully! `,
+            message: `Withdrawal request of ₹${amount} submitted successfully! 🎉`,
             remainingWalletBalance: driver.walletBalance
         });
     } catch (error) {
         return res.status(500).json({ success: false, message: error.message });
     }
 });
-
+     
 // 📜 DRIVER WITHDRAWAL HISTORY ROUTE
 router.get('/rides/withdrawal-history/:driverId', async (req, res) => {
     try {

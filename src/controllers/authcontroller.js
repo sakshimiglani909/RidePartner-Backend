@@ -4,6 +4,7 @@ dns.setDefaultResultOrder('ipv4first');
 const dotenv = require('dotenv'); 
 dotenv.config();
 
+
 const User = require('../models/User');
 const Driver = require('../models/Driver');
 const jwt = require('jsonwebtoken');
@@ -62,7 +63,7 @@ const sendEmailHelper = async ({ to, subject, html }) => {
             method: 'POST',
             headers: {
                 'accept': 'application/json',
-                'api-key': process.env.BREVO_API_KEY,
+                'api-key': process.env.BREVO_API_KEY ? process.env.BREVO_API_KEY.trim() : '',
                 'content-type': 'application/json'
             },
             body: JSON.stringify({
