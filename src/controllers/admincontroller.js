@@ -1,4 +1,5 @@
 const Driver = require('../models/Driver');
+const Withdrawal = require('../models/withdrawal');
 const sendDualNotification = async ({ userId, fcmToken, socketEvent, title, body, screen, extraData = {} }) => {
     const payload = { screen, title, body, ...extraData };
 
@@ -208,7 +209,7 @@ exports.suspendDriver = async (req, res) => {
             extraData: { status: 'suspended' }
         });
 
-        driver.isVerified = 'suspended';
+        driver.isVerified = 'blocked';
         driver.fcmToken = '';
         await driver.save();
 
@@ -304,5 +305,137 @@ exports.getAdminFinancialLedger = async (req, res) => {
     } catch (error) {
         console.error("🔥 ADMIN LEDGER ERROR:", error);
         return res.status(500).json({ success: false, message: "Server error", error: error.message });
+    }
+};
+// 💰 ADMIN: GET ALL WITHDRAWAL REQUESTS
+exports.getWithdrawalRequests = async (req, res) => {
+    try {
+        const withdrawals = await Withdrawal.find({})
+            .sort({ createdAt: -1 });
+
+        return res.status(200).json({
+            success: true,
+            withdrawals
+        });
+
+    } catch (error) {
+        console.error("🔥 GET WITHDRAWALS ERROR:", error);
+
+        return res.status(500).json({
+            success: false,
+            message: "Server error",
+            error: error.message
+        });
+    }
+};
+
+// 💰 ADMIN: APPROVE WITHDRAWAL REQUEST
+exports.approveWithdrawal = async (req, res) => {
+    try {
+        const { withdrawalId } = req.body;
+
+        if (!withdrawalId) {
+            return res.status(400).json({
+                success: false,
+                message: "withdrawalId is required!"
+            });
+        }
+
+        const withdrawal = await Withdrawal.findById(withdrawalId);
+
+        if (!withdrawal) {
+            return res.status(404).json({
+                success: false,
+                message: "Withdrawal request not found!"
+            });
+        }
+
+        if (withdrawal.status !== 'PENDING') {
+            return res.status(400).json({
+                success: false,
+                message: `Withdrawal is already ${withdrawal.status}!`
+            });
+        }
+
+        withdrawal.status = 'APPROVED';
+        await withdrawal.save();
+
+        return res.status(200).json({
+            success: true,
+            message: "Withdrawal approved successfully!",
+            withdrawal
+        });
+
+    } catch (error) {
+        console.error("🔥 APPROVE WITHDRAWAL ERROR:", error);
+
+        return res.status(500).json({
+            success: false,
+            message: "Server error",
+            error: error.message
+        });
+    }
+};
+// 💰 ADMIN: REJECT WITHDRAWAL REQUEST
+exports.rejectWithdrawal = async (req, res) => {
+    try {
+        const { withdrawalId, reason } = req.body;
+
+        if (!withdrawalId) {
+            return res.status(400).json({
+                success: false,
+                message: "withdrawalId is required!"
+            });
+        }
+
+        const withdrawal = await Withdrawal.findById(withdrawalId);
+
+        if (!withdrawal) {
+            return res.status(404).json({
+                success: false,
+                message: "Withdrawal request not found!"
+            });
+        }
+
+        if (withdrawal.status !== 'PENDING') {
+            return res.status(400).json({
+                success: false,
+                message: `Withdrawal is already ${withdrawal.status}!`
+            });
+        }
+
+        // Driver ko find karo
+        const driver = await Driver.findById(withdrawal.driverId);
+
+        if (!driver) {
+            return res.status(404).json({
+                success: false,
+                message: "Driver not found!"
+            });
+        }
+
+        // 💰 Rejected amount driver ke wallet me wapas
+        driver.walletBalance = (driver.walletBalance || 0) + withdrawal.amount;
+        await driver.save();
+
+        // Withdrawal status update
+        withdrawal.status = 'REJECTED';
+        await withdrawal.save();
+
+        return res.status(200).json({
+            success: true,
+            message: "Withdrawal rejected and amount returned to driver's wallet.",
+            withdrawal,
+            walletBalance: driver.walletBalance
+        });
+
+    } catch (error) {
+        console.error("🔥 REJECT WITHDRAWAL ERROR:", error);
+
+        return res.status(500).json({
+            success: false,
+            message: "Server error",
+            error: error.message
+        });
     }
 };

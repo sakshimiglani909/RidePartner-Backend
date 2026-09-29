@@ -9,10 +9,20 @@ const {
     submitDriverApplication, 
     suspendDriver, 
     unblockDriver, 
-    getAdminFinancialLedger // 👈 Yeh function import karna zaroori hai!
+    getAdminFinancialLedger,
+
+    // 🟢 Withdrawal Management
+    getWithdrawalRequests,
+    approveWithdrawal,
+    rejectWithdrawal
+
 } = require('../controllers/admincontroller');
 
 // 🟢 Standardized Admin Driver Management Routes
+// 🟢 Withdrawal Management Routes
+router.get('/withdrawals', getWithdrawalRequests);
+router.post('/withdrawal/approve', approveWithdrawal);
+router.post('/withdrawal/reject', rejectWithdrawal);
 router.post('/approve', adminController.approveDriver);
 router.post('/reject', adminController.rejectDriver);
 router.post('/submit-application', adminController.submitDriverApplication);
