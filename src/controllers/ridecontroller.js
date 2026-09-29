@@ -118,7 +118,7 @@ exports.requestBookRide = async (req, res) => {
 ride.passengers.push({
             user: passengerId,
             seatsBooked: seatsRequested,
-            status: 'PENDING',
+            status: 'pending',
             otp: generatedOtp,
             exactPickup: exactPickup || 'N/A', 
             passengerName: passengerName,
@@ -777,14 +777,15 @@ exports.withdrawEarnings = async (req, res) => {
         const {
             driverId,
             amount,
-            withdrawalMethod,
-            upiId,
             accountHolderName,
             accountNumber,
-            ifscCode
+            ifscCode,
+            upiId
         } = req.body;
 
-        // 1. Amount Check
+        console.log("🔥 WITHDRAWAL BODY:", req.body);
+
+        // 1. Amount validation
         if (!driverId || !amount || Number(amount) <= 0) {
             return res.status(400).json({
                 success: false,
@@ -792,39 +793,31 @@ exports.withdrawEarnings = async (req, res) => {
             });
         }
 
-        const method = withdrawalMethod || 'bank';
-
-        // 2. Dynamic Input Validations
-        if (method === 'upi') {
-            if (!upiId || upiId.trim() === "") {
-                return res.status(400).json({
-                    success: false,
-                    message: "Please enter your UPI ID!"
-                });
-            }
-        } else if (method === 'bank') {
-            if (!accountHolderName || accountHolderName.trim() === "") {
-                return res.status(400).json({
-                    success: false,
-                    message: "Please enter account holder name!"
-                });
-            }
-            if (!accountNumber || accountNumber.trim() === "") {
-                return res.status(400).json({
-                    success: false,
-                    message: "Please enter account number!"
-                });
-            }
-            if (!ifscCode || ifscCode.trim() === "") {
-                return res.status(400).json({
-                    success: false,
-                    message: "Please enter IFSC code!"
-                });
-            }
+        // 2. Bank details are mandatory
+        if (!accountHolderName || accountHolderName.trim() === "") {
+            return res.status(400).json({
+                success: false,
+                message: "Please enter account holder name!"
+            });
         }
 
-        // 3. Driver Profile & Balance Check
+        if (!accountNumber || accountNumber.trim() === "") {
+            return res.status(400).json({
+                success: false,
+                message: "Please enter account number!"
+            });
+        }
+
+        if (!ifscCode || ifscCode.trim() === "") {
+            return res.status(400).json({
+                success: false,
+                message: "Please enter IFSC code!"
+            });
+        }
+
+        // 3. Driver check
         const driver = await Driver.findById(driverId);
+
         if (!driver) {
             return res.status(404).json({
                 success: false,
@@ -832,7 +825,9 @@ exports.withdrawEarnings = async (req, res) => {
             });
         }
 
+        // 4. Wallet balance check
         const currentBalance = driver.walletBalance || 0;
+
         if (currentBalance < Number(amount)) {
             return res.status(400).json({
                 success: false,
@@ -840,30 +835,35 @@ exports.withdrawEarnings = async (req, res) => {
             });
         }
 
-        // 4. Withdrawal Document Create
-        const WithdrawalModel = require('../models/withdrawal');
-
+        // 5. Withdrawal data
         const withdrawalData = {
             driverId: driver._id.toString(),
             amount: Number(amount),
-            withdrawalMethod: method,
-            status: 'PENDING' // Matched with Schema enum
+
+            // Bank is now the primary withdrawal method
+            withdrawalMethod: 'bank',
+
+            accountHolderName: accountHolderName.trim(),
+            accountNumber: accountNumber.trim(),
+            ifscCode: ifscCode.trim().toUpperCase(),
+
+            // UPI is OPTIONAL
+            upiId: upiId ? upiId.trim() : "",
+
+            status: 'pending'
         };
 
-        if (method === 'upi') {
-            withdrawalData.upiId = upiId.trim();
-        } else {
-            withdrawalData.accountHolderName = accountHolderName.trim();
-            withdrawalData.accountNumber = accountNumber.trim();
-            withdrawalData.ifscCode = ifscCode.trim().toUpperCase();
-        }
+        console.log("🔥 SAVING WITHDRAWAL:", withdrawalData);
 
-        const newWithdrawal = new WithdrawalModel(withdrawalData);
+        // 6. Save withdrawal
+        const newWithdrawal = new withdrawal(withdrawalData);
         await newWithdrawal.save();
 
-        // 5. Wallet Deduct
+        // 7. Deduct wallet
         driver.walletBalance = currentBalance - Number(amount);
         await driver.save();
+
+        console.log("✅ WITHDRAWAL SAVED SUCCESSFULLY");
 
         return res.status(200).json({
             success: true,
@@ -873,14 +873,14 @@ exports.withdrawEarnings = async (req, res) => {
 
     } catch (error) {
         console.error("🔥 WITHDRAWAL ERROR:", error);
+
         return res.status(500).json({
             success: false,
             message: error.message
         });
     }
 };
-       
-        
+    
 exports.getWithdrawalHistory = async (req, res) => {
     try {
         const { driverId } = req.params;

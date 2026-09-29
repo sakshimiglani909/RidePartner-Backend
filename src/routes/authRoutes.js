@@ -130,7 +130,7 @@ if (activeMethod === 'bank') {
             paymentMethod: paymentMethod || 'upi',
             upiId: paymentMethod === 'upi' ? upiId : undefined,
             bankDetails: paymentMethod === 'bank' ? bankDetails : undefined,
-            status: 'Pending'
+            status: 'pending'
         });
         await newwithdrawal.save();
 
